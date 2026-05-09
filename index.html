@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CommTrack</title>
+
+<!-- Telegram Mini App SDK — обязательный скрипт -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: rgba(255,255,255,0.07);
+    --border-strong: rgba(255,255,255,0.14);
+    --text: #f0efe8;
+    --text-muted: #7a7a82;
+    --text-dim: #4a4a52;
+    --accent: #c8f564;
+    --accent-dim: rgba(200,245,100,0.12);
+    --accent-border: rgba(200,245,100,0.3);
+    --font-head: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  html { font-size: 15px; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-head);
+    min-height: 100vh;
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+    /* убираем резиновую прокрутку в Telegram */
+    overscroll-behavior: none;
+  }
+
+  /* TAB BAR */
+  .tabbar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0; right: 0;
+    background: rgba(13,13,15,0.97);
+    border-top: 1px solid var(--border);
+    z-index: 200;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tab {
+    flex: 1;
+    padding: 10px 4px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .tab-icon { font-size: 20px; line-height: 1; }
+  .tab-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); margin-top: 3px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .tab.active .tab-label { color: var(--accent); }
+  .tab.active .tab-icon { filter: drop-shadow(0 0 6px var(--accent)); }
+
+  /* PAGES */
+  .page { display: none; padding: 1.25rem 1rem 80px; }
+  .page.active { display: block; }
+
+  /* PAGE HEADER */
+  .page-header { margin-bottom: 1.25rem; }
+  .page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+  .page-title span { color: var(--accent); }
+  .page-sub { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+  /* CARD */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 1rem; display: flex; align-items: center; gap: 7px; }
+  .card-title::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  /* PARAMS BADGES */
+  .params-strip { display: flex; gap: 8px; margin-bottom: 1.1rem; }
+  .param-badge { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; }
+  .param-badge .plabel { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; }
+  .param-badge .pval { font-family: var(--font-mono); font-size: 15px; font-weight: 500; color: var(--accent); }
+
+  /* INPUT */
+  .field { margin-bottom: 1rem; }
+  .field label { display: block; font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); margin-bottom: 5px; letter-spacing: 0.05em; }
+  .input-wrap { position: relative; }
+  .input-prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-family: var(--font-mono); font-size: 14px; color: var(--text-dim); pointer-events: none; }
+  input[type="number"] { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 12px 12px 30px; font-family: var(--font-mono); font-size: 22px; font-weight: 500; color: var(--text); outline: none; transition: border-color 0.2s; -moz-appearance: textfield; }
+  input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  input[type="number"]:focus { border-color: var(--accent-border); }
+
+  /* SCHEME BADGE */
+  .badge-scheme { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: 8px; padding: 7px 10px; font-family: var(--font-mono); font-size: 11px; color: var(--accent); margin: 0.9rem 0; }
+  .badge-scheme .arr { opacity: 0.45; }
+
+  /* METRICS */
+  .metric-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 1rem; }
+  .metric { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 0.875rem 1rem; }
+  .metric-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 5px; }
+  .metric-value { font-family: var(--font-mono); font-size: 17px; font-weight: 500; color: var(--text); }
+  .metric-value.accent { color: var(--accent); }
+  .metric-value.muted { color: var(--text-muted); }
+
+  .divider { height: 1px; background: var(--border); margin: 1rem 0; }
+
+  /* SAVE BUTTON */
+  .btn-save { width: 100%; background: var(--accent); color: #0d0d0f; font-family: var(--font-mono); font-size: 13px; font-weight: 500; border: none; border-radius: 10px; padding: 13px; cursor: pointer; transition: opacity 0.15s; letter-spacing: 0.05em; margin-top: 0.5rem; }
+  .btn-save:active { opacity: 0.8; }
+
+  /* PLANNER */
+  .slider-row { margin-bottom: 1.25rem; }
+  .slider-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .slider-top .slabel { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .slider-top .sval { font-family: var(--font-mono); font-size: 22px; font-weight: 500; color: var(--accent); }
+  input[type="range"] { -webkit-appearance: none; width: 100%; height: 4px; background: var(--border-strong); border-radius: 2px; outline: none; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--accent); }
+  input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); cursor: pointer; }
+
+  .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .plan-cell { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 0.875rem 1rem; }
+  .plan-cell .plabel { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 5px; }
+  .plan-cell .pval { font-family: var(--font-mono); font-size: 16px; font-weight: 500; }
+  .plan-cell .pval.accent { color: var(--accent); }
+  .plan-cell .pval.muted { color: var(--text-muted); }
+  .plan-note { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); margin-top: 0.75rem; text-align: center; }
+
+  /* HISTORY */
+  .hist-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .btn-clear { font-family: var(--font-mono); font-size: 11px; background: transparent; color: var(--text-dim); border: 1px solid var(--border); border-radius: 7px; padding: 5px 10px; cursor: pointer; }
+  .btn-clear:active { color: #ff5c5c; }
+  .hist-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); animation: fadein 0.2s ease; }
+  .hist-item:last-child { border-bottom: none; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+  .hist-left { font-family: var(--font-mono); font-size: 12px; }
+  .hist-date { font-size: 10px; color: var(--text-dim); margin-bottom: 2px; }
+  .hist-sub { color: var(--text-muted); font-size: 11px; }
+  .hist-comm { font-family: var(--font-mono); font-size: 15px; font-weight: 500; color: var(--accent); white-space: nowrap; }
+  .hist-empty { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); text-align: center; padding: 2rem 0; }
+
+  /* TOTALS */
+  .totals-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 1rem; }
+  .total-card { background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: 12px; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; }
+  .total-label { font-family: var(--font-mono); font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.75; }
+  .total-value { font-family: var(--font-mono); font-size: 18px; font-weight: 500; color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- PAGE: CALCULATOR -->
+<div class="page active" id="page-calc">
+  <div class="page-header">
+    <div class="page-title">Расчёт <span>комиссии</span></div>
+    <div class="page-sub">Введите объём сделки</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Параметры</div>
+    <div class="params-strip">
+      <div class="param-badge">
+        <div class="plabel">Тариф</div>
+        <div class="pval">0.02%</div>
+      </div>
+      <div class="param-badge">
+        <div class="plabel">Агент</div>
+        <div class="pval">30%</div>
+      </div>
+      <div class="param-badge">
+        <div class="plabel">Налог</div>
+        <div class="pval">6%</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Объём сделки (покупка / продажа)</label>
+      <div class="input-wrap">
+        <span class="input-prefix">&#8381;</span>
+        <input type="number" id="deal-amount" placeholder="0" min="0" step="100000" inputmode="numeric" oninput="calc()">
+      </div>
+    </div>
+
+    <div class="badge-scheme">
+      <span>Объём</span>
+      <span class="arr">&#8594;</span>
+      <span>&#215; 0.02%</span>
+      <span class="arr">&#8594;</span>
+      <span>Комис. клиента</span>
+      <span class="arr">&#8594;</span>
+      <span>&#215; 30% = доход</span>
+    </div>
+
+    <div class="metric-row">
+      <div class="metric">
+        <div class="metric-label">Комиссия клиента</div>
+        <div class="metric-value" id="client-comm">&#8381; 0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Доход агента (30%)</div>
+        <div class="metric-value accent" id="agent-comm">&#8381; 0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Налог (6%)</div>
+        <div class="metric-value muted" id="tax-val">&#8381; 0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">На руки</div>
+        <div class="metric-value accent" id="take-home">&#8381; 0</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <button class="btn-save" onclick="saveDeal()">＋ Сохранить в историю</button>
+  </div>
+</div>
+
+<!-- PAGE: PLANNER -->
+<div class="page" id="page-plan">
+  <div class="page-header">
+    <div class="page-title"><span>Планировщик</span></div>
+    <div class="page-sub">Сколько нужно обернуть</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Желаемый доход на руки</div>
+    <div class="slider-row">
+      <div class="slider-top">
+        <span class="slabel">Доход</span>
+        <span class="sval" id="slider-income-label">300 000 &#8381;</span>
+      </div>
+      <input type="range" id="income-slider" min="10000" max="3000000" step="10000" value="300000" oninput="updatePlan()">
+    </div>
+
+    <div class="plan-grid">
+      <div class="plan-cell" style="grid-column:1/-1">
+        <div class="plabel">Нужный оборот</div>
+        <div class="pval accent" id="plan-turnover" style="font-size:22px;">—</div>
+      </div>
+      <div class="plan-cell">
+        <div class="plabel">Комиссия клиента</div>
+        <div class="pval muted" id="plan-client-comm">—</div>
+      </div>
+      <div class="plan-cell">
+        <div class="plabel">Доход агента</div>
+        <div class="pval muted" id="plan-agent-comm">—</div>
+      </div>
+      <div class="plan-cell" style="grid-column:1/-1">
+        <div class="plabel">На руки (после налога)</div>
+        <div class="pval accent" id="plan-net">—</div>
+      </div>
+    </div>
+    <div class="plan-note">тариф 0.02% · агент 30% · налог 6%</div>
+  </div>
+</div>
+
+<!-- PAGE: HISTORY -->
+<div class="page" id="page-hist">
+  <div class="page-header">
+    <div class="page-title"><span>История</span></div>
+    <div class="page-sub">Сохранённые сделки</div>
+  </div>
+
+  <div class="card">
+    <div class="hist-head">
+      <div class="card-title" style="margin-bottom:0">Сделки</div>
+      <button class="btn-clear" onclick="clearHistory()">Очистить</button>
+    </div>
+    <div id="hist-list"><div class="hist-empty">Нет сохранённых сделок</div></div>
+  </div>
+
+  <div class="totals-grid" id="totals-wrap" style="display:none;">
+    <div class="total-card">
+      <span class="total-label">Суммарный объём</span>
+      <span class="total-value" id="total-vol">&#8381; 0</span>
+    </div>
+    <div class="total-card">
+      <span class="total-label">Комиссия клиентов</span>
+      <span class="total-value" id="total-client">&#8381; 0</span>
+    </div>
+    <div class="total-card">
+      <span class="total-label">Ваш доход на руки</span>
+      <span class="total-value" id="total-home">&#8381; 0</span>
+    </div>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tabbar">
+  <div class="tab active" id="tab-calc" onclick="switchTab('calc')">
+    <div class="tab-icon">🧮</div>
+    <div class="tab-label">Расчёт</div>
+  </div>
+  <div class="tab" id="tab-plan" onclick="switchTab('plan')">
+    <div class="tab-icon">📈</div>
+    <div class="tab-label">План</div>
+  </div>
+  <div class="tab" id="tab-hist" onclick="switchTab('hist')">
+    <div class="tab-icon">🗂</div>
+    <div class="tab-label">История</div>
+  </div>
+</div>
+
+<script>
+  // ── Telegram Mini App init ──────────────────────────────────────
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand(); // открыть на всю высоту
+    // Подхватываем цвет темы Telegram если светлая
+    if (tg.colorScheme === 'light') {
+      document.documentElement.style.setProperty('--bg', '#f4f4f4');
+      document.documentElement.style.setProperty('--surface', '#ffffff');
+      document.documentElement.style.setProperty('--surface2', '#f0f0f0');
+      document.documentElement.style.setProperty('--text', '#111111');
+      document.documentElement.style.setProperty('--text-muted', '#666666');
+      document.documentElement.style.setProperty('--text-dim', '#aaaaaa');
+      document.documentElement.style.setProperty('--border', 'rgba(0,0,0,0.08)');
+    }
+  }
+
+  // ── Constants ───────────────────────────────────────────────────
+  const fmt        = v => Math.round(v).toLocaleString('ru-RU');
+  const CLIENT_RATE = 0.0002; // 0.02%
+  const AGENT_SHARE = 0.30;
+  const TAX_RATE    = 0.06;
+  let deals = [];
+
+  // ── Tab navigation ──────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'plan') updatePlan();
+  }
+
+  // ── Calculator ──────────────────────────────────────────────────
+  function calc() {
+    const amount     = parseFloat(document.getElementById('deal-amount').value) || 0;
+    const clientComm = amount * CLIENT_RATE;
+    const agentComm  = clientComm * AGENT_SHARE;
+    const tax        = agentComm * TAX_RATE;
+    const home       = agentComm - tax;
+
+    document.getElementById('client-comm').textContent = '\u20bd ' + fmt(clientComm);
+    document.getElementById('agent-comm').textContent  = '\u20bd ' + fmt(agentComm);
+    document.getElementById('tax-val').textContent     = '\u20bd ' + fmt(tax);
+    document.getElementById('take-home').textContent   = '\u20bd ' + fmt(home);
+  }
+
+  // ── Planner ─────────────────────────────────────────────────────
+  function updatePlan() {
+    const target     = parseFloat(document.getElementById('income-slider').value) || 0;
+    document.getElementById('slider-income-label').textContent = fmt(target) + ' \u20bd';
+    const turnover   = target / (CLIENT_RATE * AGENT_SHARE * (1 - TAX_RATE));
+    const clientComm = turnover * CLIENT_RATE;
+    const agentComm  = clientComm * AGENT_SHARE;
+
+    document.getElementById('plan-turnover').textContent    = '\u20bd ' + fmt(turnover);
+    document.getElementById('plan-client-comm').textContent = '\u20bd ' + fmt(clientComm);
+    document.getElementById('plan-agent-comm').textContent  = '\u20bd ' + fmt(agentComm);
+    document.getElementById('plan-net').textContent         = '\u20bd ' + fmt(target);
+  }
+
+  // ── Save deal ───────────────────────────────────────────────────
+  function saveDeal() {
+    const amount = parseFloat(document.getElementById('deal-amount').value) || 0;
+    if (!amount) {
+      if (tg) tg.showAlert('Введите объём сделки');
+      return;
+    }
+    const clientComm = amount * CLIENT_RATE;
+    const agentComm  = clientComm * AGENT_SHARE;
+    const home       = agentComm * (1 - TAX_RATE);
+    const date       = new Date().toLocaleDateString('ru-RU', { day:'2-digit', month:'short', year:'numeric' });
+    deals.unshift({ amount, clientComm, agentComm, home, date });
+    renderHistory();
+    document.getElementById('deal-amount').value = '';
+    calc();
+    if (tg) tg.showAlert('✅ Сделка сохранена!');
+  }
+
+  // ── History ─────────────────────────────────────────────────────
+  function renderHistory() {
+    const list   = document.getElementById('hist-list');
+    const totals = document.getElementById('totals-wrap');
+    if (!deals.length) {
+      list.innerHTML = '<div class="hist-empty">\u041d\u0435\u0442 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0445 \u0441\u0434\u0435\u043b\u043e\u043a</div>';
+      totals.style.display = 'none';
+      return;
+    }
+    list.innerHTML = deals.map(d => `
+      <div class="hist-item">
+        <div class="hist-left">
+          <div class="hist-date">${d.date}</div>
+          <div class="hist-sub">\u041e\u0431\u044a\u0451\u043c: \u20bd ${fmt(d.amount)} &rarr; \u043a\u043b. \u20bd ${fmt(d.clientComm)}</div>
+        </div>
+        <div class="hist-comm">\u20bd ${fmt(d.agentComm)}</div>
+      </div>`).join('');
+
+    totals.style.display = 'grid';
+    document.getElementById('total-vol').textContent    = '\u20bd ' + fmt(deals.reduce((s,d) => s + d.amount, 0));
+    document.getElementById('total-client').textContent = '\u20bd ' + fmt(deals.reduce((s,d) => s + d.clientComm, 0));
+    document.getElementById('total-home').textContent   = '\u20bd ' + fmt(deals.reduce((s,d) => s + d.home, 0));
+  }
+
+  function clearHistory() {
+    if (tg) {
+      tg.showConfirm('Очистить всю историю?', ok => { if (ok) { deals = []; renderHistory(); } });
+    } else {
+      deals = []; renderHistory();
+    }
+  }
+
+  calc();
+  updatePlan();
+</script>
+</body>
+</html>
